@@ -112,7 +112,6 @@ categorical_fields = {
 
 # -------------------- User Inputs --------------------
 st.markdown("### 📝 Input Patient Data")
-
 user_input = {}
 
 # Sliders for numeric fields
@@ -128,18 +127,23 @@ for field, options in categorical_fields.items():
 if st.button("🔍 Predict"):
     input_df = pd.DataFrame([user_input])
 
-    # Convert numerics just in case
+    # Convert numerics
     for col in slider_fields.keys():
         input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
 
-    # Encode categorical features
+    # Encode categoricals
     for col, le in label_encoders.items():
         try:
             input_df[col] = le.transform([input_df[col][0]])
         except:
             input_df[col] = [0]
 
-    input_df = input_df[X.columns]  # Match column order
+    # ✅ Fix missing columns
+    for col in X.columns:
+        if col not in input_df.columns:
+            input_df[col] = 0
+
+    input_df = input_df[X.columns]
 
     pred = model.predict(input_df)[0]
     pred_label = le_target.inverse_transform([pred])[0]
