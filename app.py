@@ -6,8 +6,37 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from PIL import Image
 
-# ---------------- Dataset & Model ----------------
+# -------------------- Page Config --------------------
+st.set_page_config(page_title="CKD Predictor", layout="centered")
+
+# Custom background CSS
+st.markdown("""
+    <style>
+        body {
+            background: linear-gradient(to right, #B6FBFF, #83A4D4);
+        }
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        .stSlider > label {
+            font-weight: 600 !important;
+            color: #222;
+        }
+        .stSelectbox > label {
+            font-weight: 600 !important;
+            color: #222;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("<h1 style='text-align:center; color:#1a237e;'>🧬 Chronic Kidney Disease Predictor</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;'>Provide test values to predict the likelihood of CKD.</p>", unsafe_allow_html=True)
+
+# -------------------- Load and Train Model --------------------
 df = pd.read_csv("kidney_disease.csv")
+
+# Clean numeric columns
 df['pcv'] = pd.to_numeric(df['pcv'], errors='coerce')
 df['rc'] = pd.to_numeric(df['rc'], errors='coerce')
 df['wc'] = pd.to_numeric(df['wc'], errors='coerce')
@@ -19,6 +48,7 @@ df['classification'] = df['classification'].str.strip()
 le_target = LabelEncoder()
 df['classification'] = le_target.fit_transform(df['classification'])
 
+# Encode categorical features
 label_encoders = {}
 for col in df.select_dtypes(include='object').columns:
     le = LabelEncoder()
@@ -32,12 +62,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 model = XGBClassifier(eval_metric='mlogloss')
 model.fit(X_train, y_train)
 
-# ---------------- Streamlit Config ----------------
-st.set_page_config(page_title="Kidney Disease Predictor", page_icon="🧬", layout="wide")
-st.markdown("<h1 style='text-align:center; color:#5e60ce;'>🔬 Chronic Kidney Disease Predictor</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;'>A smart tool to assess risk of CKD based on clinical parameters.</p>", unsafe_allow_html=True)
-
-# ---------------- Feature Labels ----------------
+# -------------------- Feature Definitions --------------------
 feature_labels = {
     'age': "Age (years)",
     'bp': "Blood Pressure (mm Hg)",
@@ -55,8 +80,8 @@ feature_labels = {
     'pot': "Potassium (mEq/L)",
     'hemo': "Hemoglobin (gms)",
     'pcv': "Packed Cell Volume",
-    'wc': "White Blood Cell Count (cells/cumm)",
-    'rc': "Red Blood Cell Count (millions/cumm)",
+    'wc': "White Blood Cell Count",
+    'rc': "Red Blood Cell Count",
     'htn': "Hypertension",
     'dm': "Diabetes Mellitus",
     'cad': "Coronary Artery Disease",
@@ -65,7 +90,13 @@ feature_labels = {
     'ane': "Anemia"
 }
 
-numeric_fields = ['age','bp','sg','al','su','bgr','bu','sc','sod','pot','hemo','pcv','wc','rc']
+slider_fields = {
+    'age': (1, 100), 'bp': (50, 180), 'sg': (1.005, 1.025),
+    'al': (0, 5), 'su': (0, 5), 'bgr': (70, 500), 'bu': (1, 200),
+    'sc': (0.1, 20), 'sod': (100, 150), 'pot': (2.5, 7.5),
+    'hemo': (3, 17), 'pcv': (10, 55), 'wc': (1000, 20000), 'rc': (2.5, 6.5)
+}
+
 categorical_fields = {
     'rbc': ['normal', 'abnormal'],
     'pc': ['normal', 'abnormal'],
@@ -79,60 +110,46 @@ categorical_fields = {
     'ane': ['yes', 'no']
 }
 
-# ---------------- Form Inputs ----------------
-st.markdown("### 🧾 Enter Medical Test Values")
+# -------------------- User Inputs --------------------
+st.markdown("### 📝 Input Patient Data")
 
-col1, col2 = st.columns(2)
 user_input = {}
 
-with col1:
-    for i, field in enumerate(numeric_fields[:len(numeric_fields)//2]):
-        user_input[field] = st.number_input(f"{feature_labels[field]}", step=0.1, min_value=0.0)
+# Sliders for numeric fields
+for field, (min_val, max_val) in slider_fields.items():
+    step = 0.001 if isinstance(min_val, float) or isinstance(max_val, float) else 1
+    user_input[field] = st.slider(f"{feature_labels[field]}", min_value=min_val, max_value=max_val, step=step, value=(min_val + max_val) / 2)
 
-with col2:
-    for i, field in enumerate(numeric_fields[len(numeric_fields)//2:]):
-        user_input[field] = st.number_input(f"{feature_labels[field]}", step=0.1, min_value=0.0)
+# Select boxes for categorical fields
+for field, options in categorical_fields.items():
+    user_input[field] = st.selectbox(f"{feature_labels[field]}", options)
 
-st.markdown("### 🔠 Select Symptoms and Conditions")
-
-cat_col1, cat_col2 = st.columns(2)
-
-with cat_col1:
-    for i, (field, options) in enumerate(list(categorical_fields.items())[:len(categorical_fields)//2]):
-        user_input[field] = st.selectbox(f"{feature_labels[field]}", options)
-
-with cat_col2:
-    for i, (field, options) in enumerate(list(categorical_fields.items())[len(categorical_fields)//2:]):
-        user_input[field] = st.selectbox(f"{feature_labels[field]}", options)
-
-# ---------------- Prediction ----------------
-if st.button("🧪 Predict CKD Risk"):
+# -------------------- Prediction --------------------
+if st.button("🔍 Predict"):
     input_df = pd.DataFrame([user_input])
 
-    # Process numeric
-    for col in numeric_fields:
+    # Convert numerics just in case
+    for col in slider_fields.keys():
         input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
 
-    # Encode categorical
+    # Encode categorical features
     for col, le in label_encoders.items():
         try:
             input_df[col] = le.transform([input_df[col][0]])
         except:
             input_df[col] = [0]
 
-    input_df = input_df[X.columns]  # Ensure order
+    input_df = input_df[X.columns]  # Match column order
 
-    prediction = model.predict(input_df)[0]
-    result = le_target.inverse_transform([prediction])[0]
+    pred = model.predict(input_df)[0]
+    pred_label = le_target.inverse_transform([pred])[0]
 
     st.markdown("---")
-    st.markdown("### 🎯 Prediction Result")
+    st.markdown("### 🧾 Prediction Result")
 
-    if result.lower() == "ckd":
+    if pred_label.lower() == "ckd":
         st.error("⚠️ Kidney Disease Detected!")
-        st.image("Kidney_disease_photo.jpg", width=350, caption="Chronic Kidney Disease")
+        st.image("Kidney_disease_photo.jpg", width=350)
     else:
         st.success("✅ No Kidney Disease Detected.")
-        st.image("Not_Kidney_disease.jpg", width=350, caption="Healthy Kidneys")
-
-    st.markdown("---")
+        st.image("Not_Kidney_disease.jpg", width=350)
