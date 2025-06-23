@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kidney Disease Predictor</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #74ebd5, #ACB6E5);
+      padding: 40px;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .lang-buttons {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .lang-buttons button {
+      margin: 0 10px;
+      padding: 8px 15px;
+      font-weight: bold;
+      border-radius: 5px;
+      border: none;
+      background: #2c3e50;
+      color: white;
+      cursor: pointer;
+    }
+    .form-container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    .form-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    label {
+      font-weight: 600;
+      margin-bottom: 5px;
+      display: block;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    input[type="text"], select {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    .slider-wrapper {
+      display: flex;
+      flex-direction: column;
+    }
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: #333;
+    }
+    .slider-value {
+      text-align: center;
+      font-weight: bold;
+      color: red;
+    }
+    button#predict-btn {
+      margin-top: 30px;
+      padding: 12px 30px;
+      background: #27ae60;
+      color: white;
+      border: none;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .result {
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+      color: #2c3e50;
+      margin-top: 30px;
+    }
+    .image-container {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .image-container img {
+      max-width: 200px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="title">Kidney Disease Predictor</h1>
+  <div class="lang-buttons">
+    <button onclick="setLanguage('en')">English</button>
+    <button onclick="setLanguage('hi')">हिंदी</button>
+    <button onclick="setLanguage('te')">తెలుగు</button>
+  </div>
+  <div class="form-container">
+    <form id="predictForm">
+      <div class="form-grid" id="form-fields"></div>
+      <button type="submit" id="predict-btn">Predict</button>
+    </form>
+    <div class="result" id="result"></div>
+    <div class="image-container">
+      <img id="ckd-image" src="Kidney_disease_photo.jpg" alt="CKD Image" />
+      <img id="nckd-image" src="Not_Kidney_disease.jpg" alt="NCKD Image" />
+    </div>
+  </div>
+
+  <script>
+    const sliderFields = {
+      age: { min: 1, max: 100, step: 1 },
+      bp: { min: 50, max: 180, step: 1 },
+      su: { min: 0, max: 5, step: 1 },
+      bgr: { min: 70, max: 500, step: 1 }
+    };
+
+    const allFields = [
+      'age','bp','sg','al','su','rbc','pc','pcc','ba','bgr','bu','sc',
+      'sod','pot','hemo','pcv','wc','rc','htn','dm','cad','appet','pe','ane'
+    ];
+
+    const categoricalFieldsBase = {
+      rbc: ['normal', 'abnormal'],
+      pc: ['normal', 'abnormal'],
+      pcc: ['present', 'notpresent'],
+      ba: ['present', 'notpresent'],
+      htn: ['yes', 'no'],
+      dm: ['yes', 'no'],
+      cad: ['yes', 'no'],
+      appet: ['good', 'poor'],
+      pe: ['yes', 'no'],
+      ane: ['yes', 'no']
+    };
+
+    const translations = {
+      en: {
+        title: "Kidney Disease Predictor",
+        Predict: "Predict",
+        result: "Result:",
+        prediction_labels: { ckd: "Kidney Disease", notckd: "No Kidney Disease" },
+        fields: {
+          age: "Age", bp: "Blood Pressure", sg: "Specific Gravity", al: "Albumin", su: "Sugar",
+          rbc: "Red Blood Cells", pc: "Pus Cell", pcc: "Pus Cell Clumps", ba: "Bacteria",
+          bgr: "Blood Glucose Random", bu: "Blood Urea", sc: "Serum Creatinine", sod: "Sodium",
+          pot: "Potassium", hemo: "Hemoglobin", pcv: "Packed Cell Volume", wc: "WBC Count",
+          rc: "RBC Count", htn: "Hypertension", dm: "Diabetes Mellitus", cad: "Coronary Disease",
+          appet: "Appetite", pe: "Pedal Edema", ane: "Anemia"
+        },
+        options: categoricalFieldsBase
+      },
+      hi: {
+        title: "किडनी रोग पूर्वानुमान",
+        Predict: "भविष्यवाणी करें",
+        result: "परिणाम:",
+        prediction_labels: { ckd: "किडनी रोग", notckd: "कोई किडनी रोग नहीं" },
+        fields: {
+          age: "आयु", bp: "ब्लड प्रेशर", sg: "विशिष्ट गुरुत्व", al: "एल्ब्युमिन", su: "शुगर",
+          rbc: "लाल रक्त कोशिकाएं", pc: "पस सेल", pcc: "पस सेल क्लंप्स", ba: "बैक्टीरिया",
+          bgr: "रक्त ग्लूकोज", bu: "रक्त यूरिया", sc: "सीरम क्रिएटिनिन", sod: "सोडियम",
+          pot: "पोटेशियम", hemo: "हीमोग्लोबिन", pcv: "पैक्ड सेल वॉल्यूम", wc: "श्वेत रक्त कोशिकाएं",
+          rc: "लाल रक्त कोशिकाएं", htn: "उच्च रक्तचाप", dm: "मधुमेह", cad: "कोरोनरी रोग",
+          appet: "भूख", pe: "सूजन", ane: "अनीमिया"
+        },
+        options: {
+          rbc: ['सामान्य', 'असामान्य'], pc: ['सामान्य', 'असामान्य'],
+          pcc: ['उपस्थित', 'अनुपस्थित'], ba: ['उपस्थित', 'अनुपस्थित'],
+          htn: ['हाँ', 'नहीं'], dm: ['हाँ', 'नहीं'], cad: ['हाँ', 'नहीं'],
+          appet: ['अच्छी', 'खराब'], pe: ['हाँ', 'नहीं'], ane: ['हाँ', 'नहीं']
+        }
+      },
+      te: {
+        title: "కిడ్నీ వ్యాధి అంచనా",
+        Predict: "అంచనా వేయండి",
+        result: "ఫలితం:",
+        prediction_labels: { ckd: "కిడ్నీ వ్యాధి ఉంది", notckd: "కిడ్నీ వ్యాధి లేదు" },
+        fields: {
+          age: "వయస్సు", bp: "బిపి", sg: "నిర్దిష్ట గ్రావిటీ", al: "ఆల్బ్యుమిన్", su: "చక్కెర",
+          rbc: "ఎర్ర రక్తకణాలు", pc: "పస్ సెల్స్", pcc: "పస్ సెల్ గుంపులు", ba: "బ్యాక్టీరియా",
+          bgr: "గ్లూకోజ్ స్థాయి", bu: "బ్లడ్ యూరియా", sc: "క్రియేటినిన్", sod: "సోడియం",
+          pot: "పొటాషియం", hemo: "హీమోగ్లోబిన్", pcv: "ప్యాక్డ్ సెల్ వాల్యూమ్", wc: "వైట్ బ్లడ్ సెల్స్",
+          rc: "ఎర్ర బ్లడ్ సెల్స్", htn: "హైపర్ టెన్షన్", dm: "డయాబెటిస్", cad: "కోరోనరీ వ్యాధి",
+          appet: "ఆహార ఆకలి", pe: "కాలికి వాపు", ane: "అనీమియా"
+        },
+        options: {
+          rbc: ['సాధారణం', 'అసాధారణం'], pc: ['సాధారణం', 'అసాధారణం'],
+          pcc: ['ఉంది', 'లేదు'], ba: ['ఉంది', 'లేదు'],
+          htn: ['అవును', 'కాదు'], dm: ['అవును', 'కాదు'], cad: ['అవును', 'కాదు'],
+          appet: ['మంచిది', 'చెడ్డది'], pe: ['అవును', 'కాదు'], ane: ['అవును', 'కాదు']
+        }
+      }
+    };
+
+    let currentLang = 'en';
+
+    function setLanguage(lang) {
+      currentLang = lang;
+      document.getElementById("title").innerText = translations[lang].title;
+      document.getElementById("predict-btn").innerText = translations[lang].Predict;
+      buildForm();
+    }
+
+    function buildForm() {
+      const formFields = document.getElementById("form-fields");
+      formFields.innerHTML = "";
+      const labels = translations[currentLang].fields;
+      const options = translations[currentLang].options;
+
+      allFields.forEach(field => {
+        const wrapper = document.createElement("div");
+        const label = `<label for="${field}">${labels[field]}</label>`;
+
+        if (sliderFields[field]) {
+          const slider = sliderFields[field];
+          wrapper.className = "slider-wrapper";
+          wrapper.innerHTML = `
+            ${label}
+            <input type="range" id="${field}" name="${field}" min="${slider.min}" max="${slider.max}" step="${slider.step}" value="${(slider.min + slider.max) / 2}" oninput="document.getElementById('${field}-val').innerText = this.value">
+            <div class="slider-value" id="${field}-val">${(slider.min + slider.max) / 2}</div>
+            <div class="slider-label">
+              <span>${slider.min}</span><span>${slider.max}</span>
+            </div>
+          `;
+        } else if (options[field]) {
+          wrapper.innerHTML = `
+            ${label}
+            <select name="${field}" id="${field}">
+              ${options[field].map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+            </select>
+          `;
+        } else {
+          wrapper.innerHTML = `
+            ${label}
+            <input type="text" name="${field}" id="${field}" placeholder="${labels[field]}">
+          `;
+        }
+
+        formFields.appendChild(wrapper);
+      });
+    }
+
+    document.getElementById("predictForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const formData = {};
+      allFields.forEach(field => {
+        formData[field] = document.getElementById(field).value;
+      });
+
+      fetch("http://127.0.0.1:5000/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      })
+      .then(res => res.json())
+      .then(data => {
+        const resultText = translations[currentLang].prediction_labels[data.prediction] || data.prediction;
+        document.getElementById("result").innerText = `${translations[currentLang].result} ${resultText}`;
+        document.getElementById("ckd-image").style.display = data.prediction === "ckd" ? "inline-block" : "none";
+        document.getElementById("nckd-image").style.display = data.prediction === "notckd" ? "inline-block" : "none";
+      })
+      .catch(err => {
+        document.getElementById("result").innerText = "Error: Could not connect to server.";
+        console.error(err);
+      });
+    });
+
+    setLanguage('en');
+  </script>
+</body>
+</html>
