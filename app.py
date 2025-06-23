@@ -1,47 +1,58 @@
+import streamlit as st
+import pandas as pd
+from xgboost import XGBClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 
+# Set page config
+st.set_page_config(
+    page_title="Kidney Disease Predictor",
+    page_icon="🩺",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
+
+# Load and preprocess dataset
 @st.cache_data
 def load_data():
-    try:
-        df = pd.read_csv('kidney_disease.csv')
-        
-        # Data cleaning
-        df['classification'] = df['classification'].str.strip()
-        df = df[df['classification'].isin(['ckd', 'notckd'])]  # Keep only valid classes
-        
-        # Convert string-numeric fields
-        numeric_cols = ['pcv', 'rc', 'wc', 'age', 'bp', 'sg', 'al', 'su', 'bgr', 'bu', 
-                       'sc', 'sod', 'pot', 'hemo']
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # Fill missing values
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                df[col] = df[col].fillna(df[col].mode()[0])
-            else:
-                df[col] = df[col].fillna(df[col].median())
-        
-        # Encode target
-        le_target = LabelEncoder()
-        df['classification'] = le_target.fit_transform(df['classification'])
-        
-        # Drop 'id' if present
-        if 'id' in df.columns:
-            df = df.drop('id', axis=1)
-        
-        # Encode categorical features
-        label_encoders = {}
-        for col in df.columns:
-            if df[col].dtype == 'object' and col != 'classification':
-                le = LabelEncoder()
-                df[col] = le.fit_transform(df[col])
-                label_encoders[col] = le
-        
-        return df, le_target, label_encoders
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        return None, None, None
+    df = pd.read_csv('kidney_disease.csv')
+    
+    # Data cleaning
+    df['classification'] = df['classification'].str.strip()
+    df = df[df['classification'].isin(['ckd', 'notckd'])]  # Keep only valid classes
+    
+    # Convert string-numeric fields
+    numeric_cols = ['pcv', 'rc', 'wc', 'age', 'bp', 'sg', 'al', 'su', 'bgr', 'bu', 
+                   'sc', 'sod', 'pot', 'hemo']
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # Fill missing values
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            df[col] = df[col].fillna(df[col].mode()[0])
+        else:
+            df[col] = df[col].fillna(df[col].median())
+    
+    # Encode target
+    le_target = LabelEncoder()
+    df['classification'] = le_target.fit_transform(df['classification'])
+    
+    # Drop 'id' if present
+    if 'id' in df.columns:
+        df = df.drop('id', axis=1)
+    
+    # Encode categorical features
+    label_encoders = {}
+    for col in df.columns:
+        if df[col].dtype == 'object' and col != 'classification':
+            le = LabelEncoder()
+            df[col] = le.fit_transform(df[col])
+            label_encoders[col] = le
+    
+    return df, le_target, label_encoders
 
 df, le_target, label_encoders = load_data()
 
@@ -106,6 +117,26 @@ translations = {
             'htn': ['हाँ', 'नहीं'], 'dm': ['हाँ', 'नहीं'], 'cad': ['हाँ', 'नहीं'],
             'appet': ['अच्छी', 'खराब'], 'pe': ['हाँ', 'नहीं'], 'ane': ['हाँ', 'नहीं']
         }
+    },
+    'te': {
+        'title': "కిడ్నీ వ్యాధి అంచనా",
+        'predict': "అంచనా వేయండి",
+        'result': "ఫలితం:",
+        'prediction_labels': {'ckd': "కిడ్నీ వ్యాధి ఉంది", 'notckd': "కిడ్నీ వ్యాధి లేదు"},
+        'fields': {
+            'age': "వయస్సు", 'bp': "బిపి", 'sg': "నిర్దిష్ట గ్రావిటీ", 'al': "ఆల్బ్యుమిన్", 'su': "చక్కెర",
+            'rbc': "ఎర్ర రక్తకణాలు", 'pc': "పస్ సెల్స్", 'pcc': "పస్ సెల్ గుంపులు", 'ba': "బ్యాక్టీరియా",
+            'bgr': "గ్లూకోజ్ స్థాయి", 'bu': "బ్లడ్ యూరియా", 'sc': "క్రియేటినిన్", 'sod': "సోడియం",
+            'pot': "పొటాషియం", 'hemo': "హీమోగ్లోబిన్", 'pcv': "ప్యాక్డ్ సెల్ వాల్యూమ్", 'wc': "వైట్ బ్లడ్ సెల్స్",
+            'rc': "ఎర్ర బ్లడ్ సెల్స్", 'htn': "హైపర్ టెన్షన్", 'dm': "డయాబెటిస్", 'cad': "కోరోనరీ వ్యాధి",
+            'appet': "ఆహార ఆకలి", 'pe': "కాలికి వాపు", 'ane': "అనీమియా"
+        },
+        'options': {
+            'rbc': ['సాధారణం', 'అసాధారణం'], 'pc': ['సాధారణం', 'అసాధారణం'],
+            'pcc': ['ఉంది', 'లేదు'], 'ba': ['ఉంది', 'లేదు'],
+            'htn': ['అవును', 'కాదు'], 'dm': ['అవును', 'కాదు'], 'cad': ['అవును', 'కాదు'],
+            'appet': ['మంచిది', 'చెడ్డది'], 'pe': ['అవును', 'కాదు'], 'ane': ['అవును', 'కాదు']
+        }
     }
 }
 
@@ -127,11 +158,11 @@ slider_config = {
     'rc': {'min': 2.0, 'max': 8.0, 'step': 0.1, 'value': 4.5}
 }
 
-# Sidebar
+# Sidebar for language selection and info
 with st.sidebar:
     st.title("Settings")
-    language = st.radio("Select Language", ('English', 'हिंदी'), index=0)
-    lang_code = 'en' if language == 'English' else 'hi'
+    language = st.radio("Select Language", ('English', 'हिंदी', 'తెలుగు'), index=0)
+    lang_code = 'en' if language == 'English' else 'hi' if language == 'हिंदी' else 'te'
     
     st.markdown("---")
     st.markdown("### Model Performance")
@@ -141,6 +172,8 @@ with st.sidebar:
         st.metric("Recall (CKD)", f"{report['ckd']['recall']:.1%}")
     else:
         st.warning("Model not trained properly")
+
+# Main app
 def main():
     st.title(translations[lang_code]['title'])
     
@@ -149,197 +182,70 @@ def main():
         return
     
     with st.form("prediction_form"):
-        # Create tabs for better organization
-        tab1, tab2, tab3 = st.tabs(["Basic Information", "Blood Tests", "Other Indicators"])
+        # Create expandable sections for better organization
+        with st.expander("Basic Information", expanded=True):
+            for field in ['age', 'bp', 'sg', 'al', 'su', 'rbc', 'pc', 'pcc', 'ba']:
+                label = translations[lang_code]['fields'][field]
+                
+                if field in slider_config:
+                    config = slider_config[field]
+                    st.slider(
+                        label,
+                        min_value=config['min'],
+                        max_value=config['max'],
+                        value=config['value'],
+                        step=config['step'],
+                        key=field
+                    )
+                elif field in translations[lang_code]['options']:
+                    options = translations[lang_code]['options'][field]
+                    st.selectbox(label, options, key=field)
+                else:
+                    st.text_input(label, key=field)
         
-        form_data = {}
-        
-        with tab1:
-            st.header("Basic Information")
-            cols = st.columns(2)
-            
-            with cols[0]:
-                form_data['age'] = st.slider(
-                    translations[lang_code]['fields']['age'],
-                    min_value=slider_config['age']['min'],
-                    max_value=slider_config['age']['max'],
-                    value=slider_config['age']['value'],
-                    step=slider_config['age']['step']
-                )
-                
-                form_data['bp'] = st.slider(
-                    translations[lang_code]['fields']['bp'],
-                    min_value=slider_config['bp']['min'],
-                    max_value=slider_config['bp']['max'],
-                    value=slider_config['bp']['value'],
-                    step=slider_config['bp']['step']
-                )
-                
-                form_data['sg'] = st.slider(
-                    translations[lang_code]['fields']['sg'],
-                    min_value=slider_config['sg']['min'],
-                    max_value=slider_config['sg']['max'],
-                    value=slider_config['sg']['value'],
-                    step=slider_config['sg']['step']
-                )
-                
-                form_data['al'] = st.slider(
-                    translations[lang_code]['fields']['al'],
-                    min_value=slider_config['al']['min'],
-                    max_value=slider_config['al']['max'],
-                    value=slider_config['al']['value'],
-                    step=slider_config['al']['step']
-                )
-                
-                form_data['su'] = st.slider(
-                    translations[lang_code]['fields']['su'],
-                    min_value=slider_config['su']['min'],
-                    max_value=slider_config['su']['max'],
-                    value=slider_config['su']['value'],
-                    step=slider_config['su']['step']
-                )
-                
-            with cols[1]:
-                form_data['rbc'] = st.selectbox(
-                    translations[lang_code]['fields']['rbc'],
-                    options=translations[lang_code]['options']['rbc']
-                )
-                
-                form_data['pc'] = st.selectbox(
-                    translations[lang_code]['fields']['pc'],
-                    options=translations[lang_code]['options']['pc']
-                )
-                
-                form_data['pcc'] = st.selectbox(
-                    translations[lang_code]['fields']['pcc'],
-                    options=translations[lang_code]['options']['pcc']
-                )
-                
-                form_data['ba'] = st.selectbox(
-                    translations[lang_code]['fields']['ba'],
-                    options=translations[lang_code]['options']['ba']
+        with st.expander("Blood Test Results", expanded=False):
+            for field in ['bgr', 'bu', 'sc', 'sod', 'pot', 'hemo', 'pcv', 'wc']:
+                label = translations[lang_code]['fields'][field]
+                config = slider_config[field]
+                st.slider(
+                    label,
+                    min_value=config['min'],
+                    max_value=config['max'],
+                    value=config['value'],
+                    step=config['step'],
+                    key=field
                 )
         
-        with tab2:
-            st.header("Blood Test Results")
-            cols = st.columns(2)
-            
-            with cols[0]:
-                form_data['bgr'] = st.slider(
-                    translations[lang_code]['fields']['bgr'],
-                    min_value=slider_config['bgr']['min'],
-                    max_value=slider_config['bgr']['max'],
-                    value=slider_config['bgr']['value'],
-                    step=slider_config['bgr']['step']
-                )
+        with st.expander("Other Health Indicators", expanded=False):
+            for field in ['rc', 'htn', 'dm', 'cad', 'appet', 'pe', 'ane']:
+                label = translations[lang_code]['fields'][field]
                 
-                form_data['bu'] = st.slider(
-                    translations[lang_code]['fields']['bu'],
-                    min_value=slider_config['bu']['min'],
-                    max_value=slider_config['bu']['max'],
-                    value=slider_config['bu']['value'],
-                    step=slider_config['bu']['step']
-                )
-                
-                form_data['sc'] = st.slider(
-                    translations[lang_code]['fields']['sc'],
-                    min_value=slider_config['sc']['min'],
-                    max_value=slider_config['sc']['max'],
-                    value=slider_config['sc']['value'],
-                    step=slider_config['sc']['step']
-                )
-                
-                form_data['sod'] = st.slider(
-                    translations[lang_code]['fields']['sod'],
-                    min_value=slider_config['sod']['min'],
-                    max_value=slider_config['sod']['max'],
-                    value=slider_config['sod']['value'],
-                    step=slider_config['sod']['step']
-                )
-                
-            with cols[1]:
-                form_data['pot'] = st.slider(
-                    translations[lang_code]['fields']['pot'],
-                    min_value=slider_config['pot']['min'],
-                    max_value=slider_config['pot']['max'],
-                    value=slider_config['pot']['value'],
-                    step=slider_config['pot']['step']
-                )
-                
-                form_data['hemo'] = st.slider(
-                    translations[lang_code]['fields']['hemo'],
-                    min_value=slider_config['hemo']['min'],
-                    max_value=slider_config['hemo']['max'],
-                    value=slider_config['hemo']['value'],
-                    step=slider_config['hemo']['step']
-                )
-                
-                form_data['pcv'] = st.slider(
-                    translations[lang_code]['fields']['pcv'],
-                    min_value=slider_config['pcv']['min'],
-                    max_value=slider_config['pcv']['max'],
-                    value=slider_config['pcv']['value'],
-                    step=slider_config['pcv']['step']
-                )
-                
-                form_data['wc'] = st.slider(
-                    translations[lang_code]['fields']['wc'],
-                    min_value=slider_config['wc']['min'],
-                    max_value=slider_config['wc']['max'],
-                    value=slider_config['wc']['value'],
-                    step=slider_config['wc']['step']
-                )
+                if field in slider_config:
+                    config = slider_config[field]
+                    st.slider(
+                        label,
+                        min_value=config['min'],
+                        max_value=config['max'],
+                        value=config['value'],
+                        step=config['step'],
+                        key=field
+                    )
+                elif field in translations[lang_code]['options']:
+                    options = translations[lang_code]['options'][field]
+                    st.selectbox(label, options, key=field)
+                else:
+                    st.text_input(label, key=field)
         
-        with tab3:
-            st.header("Other Health Indicators")
-            cols = st.columns(2)
-            
-            with cols[0]:
-                form_data['rc'] = st.slider(
-                    translations[lang_code]['fields']['rc'],
-                    min_value=slider_config['rc']['min'],
-                    max_value=slider_config['rc']['max'],
-                    value=slider_config['rc']['value'],
-                    step=slider_config['rc']['step']
-                )
-                
-                form_data['htn'] = st.selectbox(
-                    translations[lang_code]['fields']['htn'],
-                    options=translations[lang_code]['options']['htn']
-                )
-                
-                form_data['dm'] = st.selectbox(
-                    translations[lang_code]['fields']['dm'],
-                    options=translations[lang_code]['options']['dm']
-                )
-                
-                form_data['cad'] = st.selectbox(
-                    translations[lang_code]['fields']['cad'],
-                    options=translations[lang_code]['options']['cad']
-                )
-                
-            with cols[1]:
-                form_data['appet'] = st.selectbox(
-                    translations[lang_code]['fields']['appet'],
-                    options=translations[lang_code]['options']['appet']
-                )
-                
-                form_data['pe'] = st.selectbox(
-                    translations[lang_code]['fields']['pe'],
-                    options=translations[lang_code]['options']['pe']
-                )
-                
-                form_data['ane'] = st.selectbox(
-                    translations[lang_code]['fields']['ane'],
-                    options=translations[lang_code]['options']['ane']
-                )
-        
-        # Submit button at the bottom
+        # Submit button outside the expanders but inside the form
         submitted = st.form_submit_button(translations[lang_code]['predict'])
         
         if submitted:
             try:
                 # Prepare data for prediction
+                form_data = {}
+                for field in translations[lang_code]['fields'].keys():
+                    form_data[field] = st.session_state[field]
+                
                 input_df = pd.DataFrame([form_data])
                 
                 # Convert to numeric
@@ -402,3 +308,6 @@ def main():
             
             except Exception as e:
                 st.error(f"Prediction failed: {str(e)}")
+
+if __name__ == "__main__":
+    main()
