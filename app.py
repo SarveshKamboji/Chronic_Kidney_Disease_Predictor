@@ -20,7 +20,7 @@ def load_data():
     
     # Data cleaning
     df['classification'] = df['classification'].str.strip()
-    df = df[df['classification'].isin(['ckd', 'notckd'])]  # Keep only valid classes
+    df = df[df['classification'].isin(['ckd', 'notckd'])]
     
     # Convert string-numeric fields
     numeric_cols = ['pcv', 'rc', 'wc', 'age', 'bp', 'sg', 'al', 'su', 'bgr', 'bu', 
@@ -181,133 +181,133 @@ def main():
         st.error("Model failed to load. Please check the data and try again.")
         return
     
-    with st.form("prediction_form"):
-        # Create expandable sections for better organization
-        with st.expander("Basic Information", expanded=True):
-            for field in ['age', 'bp', 'sg', 'al', 'su', 'rbc', 'pc', 'pcc', 'ba']:
-                label = translations[lang_code]['fields'][field]
-                
-                if field in slider_config:
-                    config = slider_config[field]
-                    st.slider(
-                        label,
-                        min_value=config['min'],
-                        max_value=config['max'],
-                        value=config['value'],
-                        step=config['step'],
-                        key=field
-                    )
-                elif field in translations[lang_code]['options']:
-                    options = translations[lang_code]['options'][field]
-                    st.selectbox(label, options, key=field)
-                else:
-                    st.text_input(label, key=field)
-        
-        with st.expander("Blood Test Results", expanded=False):
-            for field in ['bgr', 'bu', 'sc', 'sod', 'pot', 'hemo', 'pcv', 'wc']:
-                label = translations[lang_code]['fields'][field]
+    # Initialize form data dictionary
+    form_data = {}
+    
+    # Create form
+    with st.form("kidney_prediction_form"):
+        # Basic Information
+        st.subheader("Basic Information")
+        for field in ['age', 'bp', 'sg', 'al', 'su', 'rbc', 'pc', 'pcc', 'ba']:
+            label = translations[lang_code]['fields'][field]
+            
+            if field in slider_config:
                 config = slider_config[field]
-                st.slider(
+                form_data[field] = st.slider(
                     label,
                     min_value=config['min'],
                     max_value=config['max'],
                     value=config['value'],
-                    step=config['step'],
-                    key=field
+                    step=config['step']
                 )
+            elif field in translations[lang_code]['options']:
+                options = translations[lang_code]['options'][field]
+                form_data[field] = st.selectbox(label, options)
+            else:
+                form_data[field] = st.text_input(label)
         
-        with st.expander("Other Health Indicators", expanded=False):
-            for field in ['rc', 'htn', 'dm', 'cad', 'appet', 'pe', 'ane']:
-                label = translations[lang_code]['fields'][field]
-                
-                if field in slider_config:
-                    config = slider_config[field]
-                    st.slider(
-                        label,
-                        min_value=config['min'],
-                        max_value=config['max'],
-                        value=config['value'],
-                        step=config['step'],
-                        key=field
-                    )
-                elif field in translations[lang_code]['options']:
-                    options = translations[lang_code]['options'][field]
-                    st.selectbox(label, options, key=field)
-                else:
-                    st.text_input(label, key=field)
+        # Blood Test Results
+        st.subheader("Blood Test Results")
+        for field in ['bgr', 'bu', 'sc', 'sod', 'pot', 'hemo', 'pcv', 'wc']:
+            label = translations[lang_code]['fields'][field]
+            config = slider_config[field]
+            form_data[field] = st.slider(
+                label,
+                min_value=config['min'],
+                max_value=config['max'],
+                value=config['value'],
+                step=config['step']
+            )
         
-        # Submit button outside the expanders but inside the form
-        submitted = st.form_submit_button(translations[lang_code]['predict'])
-        
-        if submitted:
-            try:
-                # Prepare data for prediction
-                form_data = {}
-                for field in translations[lang_code]['fields'].keys():
-                    form_data[field] = st.session_state[field]
-                
-                input_df = pd.DataFrame([form_data])
-                
-                # Convert to numeric
-                for col in slider_config.keys():
-                    if col in input_df.columns:
-                        input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
-                
-                # Encode categorical features
-                for col, le in label_encoders.items():
-                    if col in input_df.columns:
-                        try:
-                            input_df[col] = le.transform(input_df[col])
-                        except ValueError:
-                            input_df[col] = 0  # Default value if encoding fails
-                
-                # Make prediction
-                prediction = model.predict(input_df)[0]
-                predicted_class = le_target.inverse_transform([prediction])[0]
-                
-                # Display result
-                st.markdown("---")
-                result_col1, result_col2 = st.columns([1, 3])
-                
-                with result_col1:
-                    try:
-                        if predicted_class == 'ckd':
-                            st.image("assets/ckd_image.jpg", width=200)
-                        else:
-                            st.image("assets/healthy_kidney.jpg", width=200)
-                    except:
-                        st.warning("Could not load result image")
-                
-                with result_col2:
-                    result_text = translations[lang_code]['prediction_labels'].get(predicted_class, predicted_class)
-                    color = "red" if predicted_class == 'ckd' else "green"
-                    st.markdown(f"""
-                    <h2 style='color: {color};'>
-                        {translations[lang_code]['result']} {result_text}
-                    </h2>
-                    """, unsafe_allow_html=True)
-                    
-                    if predicted_class == 'ckd':
-                        st.warning("Consult a nephrologist immediately for further evaluation and treatment.")
-                        st.info("""
-                        **Recommended Actions:**
-                        - Schedule an appointment with a kidney specialist
-                        - Monitor blood pressure regularly
-                        - Reduce salt and protein intake
-                        - Stay hydrated
-                        """)
-                    else:
-                        st.success("No signs of kidney disease detected. Maintain a healthy lifestyle!")
-                        st.info("""
-                        **Prevention Tips:**
-                        - Drink plenty of water
-                        - Maintain healthy blood pressure
-                        - Control blood sugar if diabetic
-                        - Avoid excessive painkiller use
-                        """)
+        # Other Health Indicators
+        st.subheader("Other Health Indicators")
+        for field in ['rc', 'htn', 'dm', 'cad', 'appet', 'pe', 'ane']:
+            label = translations[lang_code]['fields'][field]
             
-            except Exception as e:
-                st.error(f"Prediction failed: {str(e)}")
+            if field in slider_config:
+                config = slider_config[field]
+                form_data[field] = st.slider(
+                    label,
+                    min_value=config['min'],
+                    max_value=config['max'],
+                    value=config['value'],
+                    step=config['step']
+                )
+            elif field in translations[lang_code]['options']:
+                options = translations[lang_code]['options'][field]
+                form_data[field] = st.selectbox(label, options)
+            else:
+                form_data[field] = st.text_input(label)
+        
+        # Submit button - THIS IS THE CRUCIAL FIX
+        submitted = st.form_submit_button(translations[lang_code]['predict'])
+    
+    # Prediction logic (outside the form but in the same main() function)
+    if submitted:
+        try:
+            # Prepare data for prediction
+            input_df = pd.DataFrame([form_data])
+            
+            # Convert to numeric
+            for col in slider_config.keys():
+                if col in input_df.columns:
+                    input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
+            
+            # Encode categorical features
+            for col, le in label_encoders.items():
+                if col in input_df.columns:
+                    try:
+                        input_df[col] = le.transform(input_df[col])
+                    except ValueError:
+                        input_df[col] = 0  # Default value if encoding fails
+            
+            # Make prediction
+            prediction = model.predict(input_df)[0]
+            predicted_class = le_target.inverse_transform([prediction])[0]
+            
+            # Display result
+            st.markdown("---")
+            result_col1, result_col2 = st.columns([1, 3])
+            
+            with result_col1:
+                try:
+                    if predicted_class == 'ckd':
+                        st.image("assets/ckd_image.jpg", width=200)
+                    else:
+                        st.image("assets/healthy_kidney.jpg", width=200)
+                except:
+                    st.warning("Could not load result image")
+            
+            with result_col2:
+                result_text = translations[lang_code]['prediction_labels'].get(predicted_class, predicted_class)
+                color = "red" if predicted_class == 'ckd' else "green"
+                st.markdown(f"""
+                <h2 style='color: {color};'>
+                    {translations[lang_code]['result']} {result_text}
+                </h2>
+                """, unsafe_allow_html=True)
+                
+                if predicted_class == 'ckd':
+                    st.warning("Consult a nephrologist immediately for further evaluation and treatment.")
+                    st.info("""
+                    **Recommended Actions:**
+                    - Schedule an appointment with a kidney specialist
+                    - Monitor blood pressure regularly
+                    - Reduce salt and protein intake
+                    - Stay hydrated
+                    """)
+                else:
+                    st.success("No signs of kidney disease detected. Maintain a healthy lifestyle!")
+                    st.info("""
+                    **Prevention Tips:**
+                    - Drink plenty of water
+                    - Maintain healthy blood pressure
+                    - Control blood sugar if diabetic
+                    - Avoid excessive painkiller use
+                    """)
+        
+        except Exception as e:
+            st.error(f"Prediction failed: {str(e)}")
 
 if __name__ == "__main__":
     main()
